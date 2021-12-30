@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5 import uic
 from PyQt5.QtCore import *
 import pykorbit
+import requests
 form_class = uic.loadUiType("myWindow.ui")[0]
 
 class MyWindow(QMainWindow, form_class):
@@ -26,6 +27,15 @@ class MyWindow(QMainWindow, form_class):
         cur_time = QTime.currentTime()
         str_time = cur_time.toString("hh:mm:ss")
         self.statusBar().showMessage(str_time)
+
+class MySignal(QObject):
+    signal1 = pyqtSignal()
+
+    def run(self):
+        self.signal1.emit()
+
+url = "http://naver.com"
+response = requests.get(url)
 
 app = QApplication(sys.argv)
 window = MyWindow()
