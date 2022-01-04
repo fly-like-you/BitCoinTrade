@@ -1,52 +1,68 @@
 import sys
+import pybithumb
 from PyQt5.QtWidgets import *
 from PyQt5 import uic
 from PyQt5.QtCore import *
+import time
 import pykorbit
 import requests
-form_class = uic.loadUiType("myWindow.ui")[0]
 
+con_key = "31363190a625d2e343de5aa897e1e9ce"
+sec_key = "4b47a30af3597d54b8c5c562914f7465"
+bithumb = pybithumb.Bithumb(con_key, sec_key)
+form_class = uic.loadUiType("bull.ui")[0]
+tickers = ["BTC", "ETH", "BCH", "ETC"]
+
+class Worker(QThread):
+    finished = pyqtSignal(dict)
+    def run(self):
+        while True:
+            data = {}
+
+            for ticker in tickers:
+                data[ticker] = self.get_market_infos(ticker)
+            self.finished.emit(data)
+            time.sleep(2)
+    def get_market_infos(self, ticker):
+        try:
+            df = pybithumb.get_ohlcv(ticker)
+            ma5 = df['close'].rolling(window=5).mean()
+            last_ma5 = ma5[-2]
+            price = pybithumb.get_current_price(ticker)
+
+            state = None
+            if price > last_ma5:
+                state = "상승장"
+            else:
+                state = "하락장"
+            return price, last_ma5, state
+        except:
+            return None, None, None
 class MyWindow(QMainWindow, form_class):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.pushButton.clicked.connect(self.inquiry)   # when buttons clicked,  start function inquiry
 
-        '''
-        QTimer를 사용하려면 윈도우가 생성될 때 QTimer 객체를 생성해야한다. 객체에는 interval설정이 필요하다. interval은 얼마나 자주 이벤트가 발생하는지 의미하며,
-        현재코드는 1초를 기준으로 두었다.
-        '''
-        self.timer = QTimer(self)
-        self.timer.start(1000)
-        self.timer.timeout.connect(self.inquiry)
+        self.worker = Worker()
+        self.worker.finished.connect(self.update_table_widget)
+        self.worker.start()
+
+    @pyqtSlot(dict)
+    def update_table_widget(self, data):
+        try:
+            for ticker, infos in data.items():
+                index = tickers.index(ticker)
+
+                self.tableWidget.setItem(index, 0, QTableWidgetItem(ticker))
+                self.tableWidget.setItem(index, 1, QTableWidgetItem(str(infos[0])))
+                self.tableWidget.setItem(index, 2, QTableWidgetItem(str(infos[1])))
+                self.tableWidget.setItem(index, 3, QTableWidgetItem(str(infos[2])))
+        except:
+            pass
 
 
-    def inquiry(self):
-        price = pykorbit.get_current_price("BTC")
-        self.lineEdit.setText(str(price))
-        cur_time = QTime.currentTime()
-        str_time = cur_time.toString("hh:mm:ss")
-        self.statusBar().showMessage(str_time)
-
-class MySignal(QObject):
-    signal1 = pyqtSignal()
-
-    def run(self):
-        self.signal1.emit()
-
-url = "http://naver.com"
-response = requests.get(url)
 
 app = QApplication(sys.argv)
-window = MyWindow()
-window.show()
+win = MyWindow()
+win.show()
 app.exec_()
-
-'''
-    할리스 10,300 원 나 악기
-    큐브락 21,000 원 나 악기
-    미스터 피자 51,600 나 악기 재호 문어 인당 12,900원
-    보겜 음료 17,600 나 악기 재호 문어  인당 4,400 원
-    보겜 15,900원 나 악기 재호 문어  음료 재호 4500 나 4500 문어 ?? 악기 ??
-    문어 1
-'''
